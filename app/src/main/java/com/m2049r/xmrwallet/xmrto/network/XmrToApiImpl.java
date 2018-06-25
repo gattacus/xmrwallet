@@ -19,6 +19,7 @@ package com.m2049r.xmrwallet.xmrto.network;
 import android.support.annotation.NonNull;
 import android.support.annotation.VisibleForTesting;
 
+import com.m2049r.xmrwallet.xmrto.api.CreateOrderPp;
 import com.m2049r.xmrwallet.xmrto.api.XmrToCallback;
 import com.m2049r.xmrwallet.xmrto.XmrToError;
 import com.m2049r.xmrwallet.xmrto.XmrToException;
@@ -62,6 +63,11 @@ public class XmrToApiImpl implements XmrToApi, XmrToApiCall {
     public void createOrder(final double amount, @NonNull final String address,
                             @NonNull final XmrToCallback<CreateOrder> callback) {
         CreateOrderImpl.call(this, amount, address, callback);
+    }
+
+    @Override
+    public void createOrder(@NonNull String bip70url, @NonNull XmrToCallback<CreateOrderPp> callback) {
+        CreateOrderPpImpl.call(this, bip70url, callback);
     }
 
     @Override

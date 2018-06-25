@@ -18,13 +18,24 @@ package com.m2049r.xmrwallet.data;
 
 import android.net.Uri;
 
+import com.google.common.util.concurrent.ListenableFuture;
 import com.m2049r.xmrwallet.model.NetworkType;
 import com.m2049r.xmrwallet.model.Wallet;
 import com.m2049r.xmrwallet.model.WalletManager;
 import com.m2049r.xmrwallet.util.BitcoinAddressValidator;
 
+import org.bitcoinj.core.Coin;
+import org.bitcoinj.protocols.payments.PaymentProtocol;
+import org.bitcoinj.protocols.payments.PaymentProtocolException;
+import org.bitcoinj.protocols.payments.PaymentSession;
+import org.bitcoinj.uri.BitcoinURI;
+import org.bitcoinj.uri.BitcoinURIParseException;
+import org.bitcoinj.wallet.SendRequest;
+
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 
 import timber.log.Timber;
 
@@ -37,7 +48,7 @@ public class BarcodeData {
     static final String BTC_AMOUNT = "amount";
 
     public enum Asset {
-        XMR, BTC
+        XMR, BTC, BTCPP
     }
 
     public Asset asset = null;
@@ -78,8 +89,44 @@ public class BarcodeData {
         if (bcData == null) {
             bcData = parseBitcoinNaked(qrCode);
         }
+        // check for BIP70 payment request
+        if (bcData == null) {
+            bcData = parseBip70(qrCode);
+        }
         return bcData;
     }
+
+  private static BarcodeData parseBip70(String qrCode) {
+    if (qrCode.startsWith("bitcoin:")) {
+      try {
+        ListenableFuture<PaymentSession> future =
+            PaymentSession.createFromBitcoinUri(new BitcoinURI(qrCode));
+        PaymentSession session = future.get(); // may throw PaymentRequestException.
+
+        if (session.isExpired()) {
+          //                        showUserErrorMessage(); todo
+          Timber.d("session expired");
+          return null;
+        }
+        Coin amountCoin = session.getValue();
+        if (amountCoin != null) {
+          String amountStringBtc = amountCoin.toPlainString();
+          try {
+            Double.parseDouble(amountStringBtc);
+          } catch (NumberFormatException ex) {
+            Timber.d(ex.getLocalizedMessage());
+            return null; // we have an amount but its not a number!
+          }
+          return new BarcodeData(BarcodeData.Asset.BTCPP, qrCode, amountStringBtc);
+        }
+
+      } catch (Exception ex) {
+        Timber.d(ex.getLocalizedMessage());
+        return null;
+      }
+    }
+    return null;
+  }
 
     /**
      * Parse and decode a monero scheme string. It is here because it needs to validate the data.
