@@ -35,6 +35,7 @@ import android.widget.Toast;
 import com.m2049r.xmrwallet.R;
 import com.m2049r.xmrwallet.data.TxData;
 import com.m2049r.xmrwallet.data.TxDataBtc;
+import com.m2049r.xmrwallet.data.TxDataBtcPp;
 import com.m2049r.xmrwallet.model.PendingTransaction;
 import com.m2049r.xmrwallet.model.Wallet;
 import com.m2049r.xmrwallet.util.Helper;
@@ -51,25 +52,21 @@ import com.m2049r.xmrwallet.xmrto.network.XmrToApiImpl;
 import java.text.NumberFormat;
 import java.util.Locale;
 
-import okhttp3.HttpUrl;
 import timber.log.Timber;
 
 public class SendBtcConfirmWizardFragment extends SendWizardFragment implements SendConfirm {
+    final static int STAGE_X = 0;
+    final static int STAGE_A = 1;
+    final static int STAGE_B = 2;
+    final static int STAGE_C = 3;
+    private static final int XMRTO_COUNTDOWN = 10 * 60; // 10 minutes
+    private static final int XMRTO_COUNTDOWN_STEP = 1; // 1 second
     private final int QUERY_INTERVAL = 500;//ms
-
-    public static SendBtcConfirmWizardFragment newInstance(SendConfirmWizardFragment.Listener listener) {
-        SendBtcConfirmWizardFragment instance = new SendBtcConfirmWizardFragment();
-        instance.setSendListener(listener);
-        return instance;
-    }
-
     SendConfirmWizardFragment.Listener sendListener;
-
-    public SendBtcConfirmWizardFragment setSendListener(SendConfirmWizardFragment.Listener listener) {
-        this.sendListener = listener;
-        return this;
-    }
-
+    int inProgress = 0;
+    PendingTransaction pendingTransaction = null;
+    Runnable updateRunnable = null;
+    Handler handler = new Handler();
     private View llStageA;
     private SendProgressView evStageA;
     private View llStageB;
@@ -85,6 +82,22 @@ public class SendBtcConfirmWizardFragment extends SendWizardFragment implements 
     private View llConfirmSend;
     private Button bSend;
     private View pbProgressSend;
+    private boolean isResumed = false;
+    private int sendCountdown = 0;
+    private CreateOrder xmrtoOrder = null;
+    private QueryOrderStatus xmrtoStatus = null;
+    private XmrToApi xmrToApi = null;
+
+    public static SendBtcConfirmWizardFragment newInstance(SendConfirmWizardFragment.Listener listener) {
+        SendBtcConfirmWizardFragment instance = new SendBtcConfirmWizardFragment();
+        instance.setSendListener(listener);
+        return instance;
+    }
+
+    public SendBtcConfirmWizardFragment setSendListener(SendConfirmWizardFragment.Listener listener) {
+        this.sendListener = listener;
+        return this;
+    }
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -136,12 +149,6 @@ public class SendBtcConfirmWizardFragment extends SendWizardFragment implements 
 
         return view;
     }
-
-    int inProgress = 0;
-    final static int STAGE_X = 0;
-    final static int STAGE_A = 1;
-    final static int STAGE_B = 2;
-    final static int STAGE_C = 3;
 
     private void showProgress(int stage, String progressText) {
         Timber.d("showProgress(%d)", stage);
@@ -198,8 +205,6 @@ public class SendBtcConfirmWizardFragment extends SendWizardFragment implements 
         }
         inProgress = STAGE_X;
     }
-
-    PendingTransaction pendingTransaction = null;
 
     void send() {
         Timber.d("SEND @%d", sendCountdown);
@@ -262,8 +267,6 @@ public class SendBtcConfirmWizardFragment extends SendWizardFragment implements 
         return true;
     }
 
-    private boolean isResumed = false;
-
     @Override
     public void onPauseFragment() {
         isResumed = false;
@@ -279,7 +282,7 @@ public class SendBtcConfirmWizardFragment extends SendWizardFragment implements 
     public void onResumeFragment() {
         super.onResumeFragment();
         Timber.d("onResumeFragment()");
-        if (sendListener.getMode() != SendFragment.Mode.BTC || sendListener.getMode() != SendFragment.Mode.BTCPP) {
+        if (sendListener.getMode() != SendFragment.Mode.BTC && sendListener.getMode() != SendFragment.Mode.BTCPP) {
             throw new IllegalStateException("Mode is not BTC or BTCPP!");
         }
         Helper.hideKeyboard(getActivity());
@@ -295,12 +298,6 @@ public class SendBtcConfirmWizardFragment extends SendWizardFragment implements 
         } // otherwise just sit there blank
         // TODO: don't sit there blank - can this happen? should we just die?
     }
-
-    private int sendCountdown = 0;
-    private static final int XMRTO_COUNTDOWN = 10 * 60; // 10 minutes
-    private static final int XMRTO_COUNTDOWN_STEP = 1; // 1 second
-
-    Runnable updateRunnable = null;
 
     void startSendTimer() {
         Timber.d("startSendTimer()");
@@ -460,8 +457,6 @@ public class SendBtcConfirmWizardFragment extends SendWizardFragment implements 
         return sendListener.getActivityCallback();
     }
 
-    private CreateOrder xmrtoOrder = null;
-
     private void processCreateOrder(final CreateOrder createOrder) {
         Timber.d("processCreateOrder %s", createOrder.getUuid());
         xmrtoOrder = createOrder;
@@ -523,9 +518,7 @@ public class SendBtcConfirmWizardFragment extends SendWizardFragment implements 
         xmrtoOrder = null;
         xmrtoStatus = null;
         showProgress(1, getString(R.string.label_send_progress_xmrto_create));
-        TxDataBtc txDataBtc = (TxDataBtc) sendListener.getTxData();
-        double btcAmount = txDataBtc.getBtcAmount();
-        getXmrToApi().createOrder(btcAmount, txDataBtc.getBtcAddress(), new XmrToCallback<CreateOrder>() {
+        final XmrToCallback<CreateOrder> callback = new XmrToCallback<CreateOrder>() {
             @Override
             public void onSuccess(CreateOrder createOrder) {
                 if (!isResumed) return;
@@ -545,10 +538,19 @@ public class SendBtcConfirmWizardFragment extends SendWizardFragment implements 
                 }
                 processCreateOrderError(ex);
             }
-        });
+        };
+        switch (sendListener.getMode()) {
+            case BTC:
+                TxDataBtc txDataBtc = (TxDataBtc) sendListener.getTxData();
+                double btcAmount = txDataBtc.getBtcAmount();
+                getXmrToApi().createOrder(btcAmount, txDataBtc.getBtcAddress(), callback);
+                break;
+            case BTCPP:
+                final TxDataBtcPp txDataBtcPp = (TxDataBtcPp) sendListener.getTxData();
+                getXmrToApi().createOrder(txDataBtcPp.getBip70url(), callback);
+                break;
+        }
     }
-
-    private QueryOrderStatus xmrtoStatus = null;
 
     private void processQueryOrder(final QueryOrderStatus status) {
         Timber.d("processQueryOrder %s for %s", status.getState().toString(), status.getUuid());
@@ -591,8 +593,6 @@ public class SendBtcConfirmWizardFragment extends SendWizardFragment implements 
             }, QUERY_INTERVAL);
         }
     }
-
-    Handler handler = new Handler();
 
     private void processQueryOrderError(final Exception ex) {
         Timber.e("processQueryOrderError %s", ex.getLocalizedMessage());
@@ -663,8 +663,6 @@ public class SendBtcConfirmWizardFragment extends SendWizardFragment implements 
             }
         });
     }
-
-    private XmrToApi xmrToApi = null;
 
     private final XmrToApi getXmrToApi() {
         if (xmrToApi == null) {

@@ -102,7 +102,7 @@ public class SendBtcAmountWizardFragment extends SendWizardFragment {
         if (!evAmount.validate(maxBtc, minBtc)) {
             return false;
         }
-        if (sendListener != null) {
+        if (sendListener != null && sendListener.getMode() == SendFragment.Mode.BTC) {
             TxDataBtc txDataBtc = (TxDataBtc) sendListener.getTxData();
             String btcString = evAmount.getAmount();
             if (btcString != null) {

@@ -35,7 +35,7 @@ public interface XmrToApi {
      */
     void createOrder(final double amount, @NonNull final String address, @NonNull final XmrToCallback<CreateOrder> callback);
 
-    void createOrder(@NonNull final String bip70url, @NonNull final XmrToCallback<CreateOrderPp> callback);
+    void createOrder(@NonNull final String bip70url, @NonNull final XmrToCallback<CreateOrder> callback);
 
     /**
      * Queries the order status for given current order

@@ -144,7 +144,7 @@ public class SendAddressWizardFragment extends SendWizardFragment {
                     llPaymentId.setVisibility(View.INVISIBLE);
                     tvPaymentIdIntegrated.setVisibility(View.INVISIBLE);
                     llXmrTo.setVisibility(View.VISIBLE);
-                    sendListener.setMode(SendFragment.Mode.BTC);
+                    sendListener.setMode(SendFragment.Mode.BTCPP);
                 }else{
                     Timber.d("isStandardAddress");
                     llPaymentId.setVisibility(View.VISIBLE);

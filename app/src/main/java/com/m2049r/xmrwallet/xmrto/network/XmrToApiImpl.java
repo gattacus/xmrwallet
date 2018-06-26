@@ -17,16 +17,14 @@
 package com.m2049r.xmrwallet.xmrto.network;
 
 import android.support.annotation.NonNull;
-import android.support.annotation.VisibleForTesting;
 
-import com.m2049r.xmrwallet.xmrto.api.CreateOrderPp;
-import com.m2049r.xmrwallet.xmrto.api.XmrToCallback;
 import com.m2049r.xmrwallet.xmrto.XmrToError;
 import com.m2049r.xmrwallet.xmrto.XmrToException;
 import com.m2049r.xmrwallet.xmrto.api.CreateOrder;
 import com.m2049r.xmrwallet.xmrto.api.QueryOrderParameters;
 import com.m2049r.xmrwallet.xmrto.api.QueryOrderStatus;
 import com.m2049r.xmrwallet.xmrto.api.XmrToApi;
+import com.m2049r.xmrwallet.xmrto.api.XmrToCallback;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -54,11 +52,6 @@ public class XmrToApiImpl implements XmrToApi, XmrToApiCall {
         this.baseUrl = baseUrl;
     }
 
-    public XmrToApiImpl(@NonNull final OkHttpClient okHttpClient) {
-        this(okHttpClient, HttpUrl.parse("https://xmr.to/api/v2/xmr2btc/"));
-    }
-
-
     @Override
     public void createOrder(final double amount, @NonNull final String address,
                             @NonNull final XmrToCallback<CreateOrder> callback) {
@@ -66,7 +59,7 @@ public class XmrToApiImpl implements XmrToApi, XmrToApiCall {
     }
 
     @Override
-    public void createOrder(@NonNull String bip70url, @NonNull XmrToCallback<CreateOrderPp> callback) {
+    public void createOrder(@NonNull String bip70url, @NonNull XmrToCallback<CreateOrder> callback) {
         CreateOrderPpImpl.call(this, bip70url, callback);
     }
 
@@ -84,20 +77,25 @@ public class XmrToApiImpl implements XmrToApi, XmrToApiCall {
 
     @Override
     public void call(@NonNull final String path, @NonNull final NetworkCallback callback) {
-        call(path, null, callback);
+        call(path, (String) null, callback);
     }
 
     @Override
     public void call(@NonNull final String path, final JSONObject request, @NonNull final NetworkCallback callback) {
+        call(path, request.toString(), callback);
+    }
+
+    @Override
+    public void call(@NonNull final String path, final String jsonString, @NonNull final NetworkCallback callback) {
         final HttpUrl url = baseUrl.newBuilder()
                 .addPathSegment(path)
                 .addPathSegment("") // xmr.to needs a trailing slash!
                 .build();
 
         Timber.d(url.toString());
-        final Request httpRequest = createHttpRequest(request, url);
+        final Request httpRequest = createHttpRequest(jsonString, url);
         Timber.d(httpRequest.toString());
-        Timber.d(request == null ? "null request" : request.toString());
+        Timber.d(jsonString == null ? "null request" : jsonString);
 
         okHttpClient.newCall(httpRequest).enqueue(new okhttp3.Callback() {
             @Override
@@ -130,10 +128,10 @@ public class XmrToApiImpl implements XmrToApi, XmrToApiCall {
         });
     }
 
-    private Request createHttpRequest(final JSONObject request, final HttpUrl url) {
+    private Request createHttpRequest(final String request, final HttpUrl url) {
         if (request != null) {
             final RequestBody body = RequestBody.create(
-                    MediaType.parse("application/json"), request.toString());
+                    MediaType.parse("application/json"), request);
 
             return new Request.Builder()
                     .url(url)

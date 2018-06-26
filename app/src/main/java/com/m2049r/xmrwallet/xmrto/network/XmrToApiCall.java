@@ -25,4 +25,6 @@ interface XmrToApiCall {
     void call(@NonNull final String path, @NonNull final NetworkCallback callback);
 
     void call(@NonNull final String path, final JSONObject request, @NonNull final NetworkCallback callback);
+
+    void call(@NonNull final String path, final String jsonString, @NonNull final NetworkCallback callback);
 }

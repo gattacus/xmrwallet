@@ -352,7 +352,7 @@ public class SendFragment extends Fragment
                     default:
                         throw new IllegalArgumentException("no such send position(" + position + ")");
                 }
-            } else if (mode == Mode.BTC) {
+            } else if (mode == Mode.BTC || mode == Mode.BTCPP) {
                 switch (position) {
                     case POS_ADDRESS:
                         return SendAddressWizardFragment.newInstance(SendFragment.this);
