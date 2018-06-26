@@ -37,6 +37,7 @@ import com.m2049r.xmrwallet.R;
 import com.m2049r.xmrwallet.data.BarcodeData;
 import com.m2049r.xmrwallet.data.TxData;
 import com.m2049r.xmrwallet.data.TxDataBtc;
+import com.m2049r.xmrwallet.data.TxDataBtcPp;
 import com.m2049r.xmrwallet.model.Wallet;
 import com.m2049r.xmrwallet.model.WalletManager;
 import com.m2049r.xmrwallet.util.BitcoinAddressValidator;
@@ -78,6 +79,7 @@ public class SendAddressWizardFragment extends SendWizardFragment {
     private View llPaymentId;
     private TextView tvXmrTo;
     private View llXmrTo;
+    private BarcodeData.Asset scanAsset;
 
     OnScanListener onScanListener;
 
@@ -136,7 +138,14 @@ public class SendAddressWizardFragment extends SendWizardFragment {
                     tvPaymentIdIntegrated.setVisibility(View.INVISIBLE);
                     llXmrTo.setVisibility(View.VISIBLE);
                     sendListener.setMode(SendFragment.Mode.BTC);
-                } else {
+                } else if (scanAsset == BarcodeData.Asset.BTCPP){
+                    Timber.d("PaymentProtocol");
+                    etPaymentId.getEditText().getText().clear();
+                    llPaymentId.setVisibility(View.INVISIBLE);
+                    tvPaymentIdIntegrated.setVisibility(View.INVISIBLE);
+                    llXmrTo.setVisibility(View.VISIBLE);
+                    sendListener.setMode(SendFragment.Mode.BTC);
+                }else{
                     Timber.d("isStandardAddress");
                     llPaymentId.setVisibility(View.VISIBLE);
                     tvPaymentIdIntegrated.setVisibility(View.INVISIBLE);
@@ -212,7 +221,8 @@ public class SendAddressWizardFragment extends SendWizardFragment {
     private boolean checkAddressNoError() {
         String address = etAddress.getEditText().getText().toString();
         return Wallet.isAddressValid(address)
-                || BitcoinAddressValidator.validate(address);
+                || BitcoinAddressValidator.validate(address)
+                || scanAsset == BarcodeData.Asset.BTCPP;
     }
 
     private boolean checkAddress() {
@@ -273,10 +283,14 @@ public class SendAddressWizardFragment extends SendWizardFragment {
                 ((TxDataBtc) txData).setBtcAddress(etAddress.getEditText().getText().toString());
                 txData.setDestinationAddress(null);
                 txData.setPaymentId("");
-            } else {
-                txData.setDestinationAddress(etAddress.getEditText().getText().toString());
-                txData.setPaymentId(etPaymentId.getEditText().getText().toString());
-            }
+            } else if (scanAsset == BarcodeData.Asset.BTCPP){
+                ((TxDataBtcPp) txData).setBip70url(etAddress.getEditText().getText().toString());
+                txData.setDestinationAddress(null);
+                txData.setPaymentId("");
+                }else{
+                    txData.setDestinationAddress(etAddress.getEditText().getText().toString());
+                    txData.setPaymentId(etPaymentId.getEditText().getText().toString());
+                }
         }
         return true;
     }
@@ -301,11 +315,16 @@ public class SendAddressWizardFragment extends SendWizardFragment {
         BarcodeData data = onScanListener.popScannedData();
         sendListener.setBarcodeData(data);
         if (data != null) {
+            scanAsset = data.asset;
             Timber.d("GOT DATA");
             String scannedAddress = data.address;
             if (scannedAddress != null) {
                 etAddress.getEditText().setText(scannedAddress);
-                checkAddress();
+                if (data.asset == BarcodeData.Asset.BTCPP){
+                    etAddress.getEditText().setInputType(InputType.TYPE_NULL);
+                }else {
+                    checkAddress();
+                }
             } else {
                 etAddress.getEditText().getText().clear();
                 etAddress.setError(null);
@@ -318,6 +337,8 @@ public class SendAddressWizardFragment extends SendWizardFragment {
                 etPaymentId.getEditText().getText().clear();
                 etPaymentId.setError(null);
             }
+        }else{
+            scanAsset = null;
         }
     }
 

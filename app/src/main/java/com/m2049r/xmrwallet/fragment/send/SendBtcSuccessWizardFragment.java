@@ -159,7 +159,7 @@ public class SendBtcSuccessWizardFragment extends SendWizardFragment {
                 df.setMaximumFractionDigits(12);
                 String btcAmount = df.format(btcData.getBtcAmount());
                 tvXmrToAmount.setText(getString(R.string.info_send_xmrto_success_btc, btcAmount));
-                //TODO         btcData.getBtcAddress();
+                //TODO         btcData.getBip70url();
                 tvTxXmrToKey.setText(btcData.getXmrtoUuid());
                 queryOrder();
             } else {

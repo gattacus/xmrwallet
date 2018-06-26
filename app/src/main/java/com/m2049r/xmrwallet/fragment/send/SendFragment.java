@@ -42,6 +42,7 @@ import com.m2049r.xmrwallet.data.BarcodeData;
 import com.m2049r.xmrwallet.data.PendingTx;
 import com.m2049r.xmrwallet.data.TxData;
 import com.m2049r.xmrwallet.data.TxDataBtc;
+import com.m2049r.xmrwallet.data.TxDataBtcPp;
 import com.m2049r.xmrwallet.dialog.HelpFragment;
 import com.m2049r.xmrwallet.layout.SpendViewPager;
 import com.m2049r.xmrwallet.model.PendingTransaction;
@@ -248,7 +249,7 @@ public class SendFragment extends Fragment
     }
 
     enum Mode {
-        XMR, BTC
+        XMR, BTC, BTCPP
     }
 
     Mode mode = Mode.XMR;
@@ -263,6 +264,9 @@ public class SendFragment extends Fragment
                     break;
                 case BTC:
                     txData = new TxDataBtc();
+                    break;
+                case BTCPP:
+                    txData = new TxDataBtcPp();
                     break;
                 default:
                     throw new IllegalArgumentException("Mode " + String.valueOf(aMode) + " unknown!");
